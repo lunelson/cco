@@ -1958,8 +1958,8 @@ if [[ $# -gt 0 ]]; then
 		claude_args=("$@")
 		;;
 	amp)
-		# Amp (Sourcegraph) mode
-		command_flag="amp"
+		# Amp (Sourcegraph) mode - skip permissions since we're in a sandbox
+		command_flag="amp --dangerously-allow-all"
 		# Add ~/.config/amp to additional directories if it exists (settings, skills, tools)
 		if [[ -d "$HOME/.config/amp" ]]; then
 			additional_dirs+=("$HOME/.config/amp")
@@ -1985,8 +1985,8 @@ if [[ $# -gt 0 ]]; then
 		claude_args=("$@")
 		;;
 	auggie)
-		# Augment Code (auggie) mode
-		command_flag="auggie"
+		# Augment Code (auggie) mode - allow all tools since we're in a sandbox
+		command_flag="auggie --permission *:allow"
 		# Add ~/.augment to additional directories if it exists (settings, state)
 		if [[ -d "$HOME/.augment" ]]; then
 			additional_dirs+=("$HOME/.augment")
