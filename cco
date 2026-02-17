@@ -1964,6 +1964,18 @@ if [[ $# -gt 0 ]]; then
 		if [[ -d "$HOME/.config/amp" ]]; then
 			additional_dirs+=("$HOME/.config/amp")
 		fi
+		# Add ~/.local/share/amp (threads, history, secrets, session)
+		if [[ -d "$HOME/.local/share/amp" ]]; then
+			additional_dirs+=("$HOME/.local/share/amp")
+		fi
+		# Add ~/.cache/amp (logs, traces)
+		if [[ -d "$HOME/.cache/amp" ]]; then
+			additional_dirs+=("$HOME/.cache/amp")
+		fi
+		# Add ~/.local/state/amp if it exists
+		if [[ -d "$HOME/.local/state/amp" ]]; then
+			additional_dirs+=("$HOME/.local/state/amp")
+		fi
 		# Add ~/.agents to additional directories if it exists (shared agent resources)
 		if [[ -d "$HOME/.agents" ]]; then
 			additional_dirs+=("$HOME/.agents")
