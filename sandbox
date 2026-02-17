@@ -41,6 +41,21 @@ abs_path() {
 	fi
 }
 
+# Like abs_path but does NOT resolve symlinks. Returns the absolute logical path
+# (tilde-expanded, with . and .. collapsed, but symlinks preserved).
+# Used to emit additional Seatbelt/bwrap rules so that programs accessing files
+# through symlink paths are not blocked.
+abs_path_no_resolve() {
+	local p="$1"
+	if [[ "$p" == "~" || "$p" == ~/* ]]; then
+		p="${p/#\~/$HOME}"
+	fi
+	if [[ "$p" != /* ]]; then
+		p="$PWD/$p"
+	fi
+	printf '%s' "$p"
+}
+
 # Escape a path for Seatbelt policy quoting: escape \ and "
 policy_quote() {
 	local s="$1"
@@ -51,7 +66,9 @@ policy_quote() {
 
 # Parse CLI
 write_paths=()
+write_paths_raw=()   # unresolved counterparts (for symlink-aware policy)
 ro_paths=()
+ro_paths_raw=()
 deny_paths=()
 backend_extra_args=()
 safe_mode=false
@@ -66,12 +83,14 @@ while [[ $# -gt 0 ]]; do
 		shift
 		[[ $# -gt 0 ]] || usage
 		write_paths+=("$(abs_path "$1")")
+		write_paths_raw+=("$(abs_path_no_resolve "$1")")
 		shift
 		;;
 	--read-only)
 		shift
 		[[ $# -gt 0 ]] || usage
 		ro_paths+=("$(abs_path "$1")")
+		ro_paths_raw+=("$(abs_path_no_resolve "$1")")
 		shift
 		;;
 	--deny)
@@ -326,7 +345,9 @@ run_linux() {
 	fi
 
 	# Process write paths that are NOT under any deny path
-	for ap in "${write_paths[@]+"${write_paths[@]}"}"; do
+	for i in "${!write_paths[@]}"; do
+		local ap="${write_paths[$i]}"
+		local raw="${write_paths_raw[$i]}"
 		local under_deny=false
 		for deny in "${deny_paths[@]+"${deny_paths[@]}"}"; do
 			if is_subpath_of "$ap" "$deny"; then
@@ -338,11 +359,17 @@ run_linux() {
 			# Ensure targets exist so bind succeeds
 			if [[ ! -d "$ap" && ! -e "$ap" ]]; then : >"$ap"; fi
 			args+=(--bind "$ap" "$ap")
+			# Also bind the unresolved symlink path so programs using it can write
+			if [[ "$raw" != "$ap" ]]; then
+				args+=(--bind "$ap" "$raw")
+			fi
 		fi
 	done
 
 	# Process read-only paths that are NOT under any deny path
-	for ap in "${ro_paths[@]+"${ro_paths[@]}"}"; do
+	for i in "${!ro_paths[@]}"; do
+		local ap="${ro_paths[$i]}"
+		local raw="${ro_paths_raw[$i]}"
 		local under_deny=false
 		for deny in "${deny_paths[@]+"${deny_paths[@]}"}"; do
 			if is_subpath_of "$ap" "$deny"; then
@@ -356,6 +383,14 @@ run_linux() {
 			else
 				if [[ ! -e "$ap" ]]; then : >"$ap"; fi
 				args+=(--ro-bind "$ap" "$ap")
+			fi
+			# Also bind the unresolved symlink path for reads
+			if [[ "$raw" != "$ap" ]]; then
+				if [[ -d "$ap" ]]; then
+					args+=(--ro-bind "$ap" "$raw")
+				else
+					args+=(--ro-bind "$ap" "$raw")
+				fi
 			fi
 		fi
 	done
@@ -558,7 +593,9 @@ run_macos() {
 		fi
 
 		# 2. Additional paths passed via -w flags
-		for ap in "${write_paths[@]+"${write_paths[@]}"}"; do
+		for i in "${!write_paths[@]}"; do
+			local ap="${write_paths[$i]}"
+			local raw="${write_paths_raw[$i]}"
 			# Check if this write path is under any deny path - if so, also allow reads
 			needs_read=false
 			if [[ "$safe_mode" == true ]]; then
@@ -583,14 +620,41 @@ run_macos() {
 					printf '(allow file-read* (literal "%s"))\n' "$(policy_quote "$ap")"
 				fi
 			fi
+
+			# If the unresolved path differs (symlink), also allow via that path.
+			# Seatbelt checks against the path as passed to the syscall, so programs
+			# that open files through the symlink path need separate rules.
+			if [[ "$raw" != "$ap" ]]; then
+				if [[ -d "$raw" ]]; then
+					printf '(allow file-write* (subpath "%s"))\n' "$(policy_quote "$raw")"
+					if [[ "$needs_read" == true ]]; then
+						printf '(allow file-read* (subpath "%s"))\n' "$(policy_quote "$raw")"
+					fi
+				else
+					printf '(allow file-write* (literal "%s"))\n' "$(policy_quote "$raw")"
+					if [[ "$needs_read" == true ]]; then
+						printf '(allow file-read* (literal "%s"))\n' "$(policy_quote "$raw")"
+					fi
+				fi
+			fi
 		done
 
 		# Read-only paths: allow reads but keep writes denied
-		for ap in "${ro_paths[@]+"${ro_paths[@]}"}"; do
+		for i in "${!ro_paths[@]}"; do
+			local ap="${ro_paths[$i]}"
+			local raw="${ro_paths_raw[$i]}"
 			if [[ -d "$ap" ]]; then
 				printf '(allow file-read* (subpath "%s"))\n' "$(policy_quote "$ap")"
 			else
 				printf '(allow file-read* (literal "%s"))\n' "$(policy_quote "$ap")"
+			fi
+			# Also allow via unresolved symlink path if different
+			if [[ "$raw" != "$ap" ]]; then
+				if [[ -d "$raw" ]]; then
+					printf '(allow file-read* (subpath "%s"))\n' "$(policy_quote "$raw")"
+				else
+					printf '(allow file-read* (literal "%s"))\n' "$(policy_quote "$raw")"
+				fi
 			fi
 		done
 

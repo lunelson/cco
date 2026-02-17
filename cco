@@ -1849,7 +1849,7 @@ while [[ $# -gt 0 ]]; do
 			while [[ $# -gt 0 ]] && [[ ! "$1" =~ ^- ]]; do
 				# Stop if we hit a known subcommand
 				case "$1" in
-				shell | codex | droid | opencode | pi | gemini | self-update | cleanup | info | backup-creds | restore-creds | pull | rebuild)
+				shell | codex | droid | opencode | pi | gemini | amp | augment | self-update | cleanup | info | backup-creds | restore-creds | pull | rebuild)
 					# This is a subcommand, not a directory
 					break
 					;;
@@ -1955,6 +1955,32 @@ if [[ $# -gt 0 ]]; then
 		fi
 		shift
 		# All remaining arguments are passed to gemini
+		claude_args=("$@")
+		;;
+	amp)
+		# Amp (Sourcegraph) mode
+		command_flag="amp"
+		# Add ~/.config/amp to additional directories if it exists (settings, skills, tools)
+		if [[ -d "$HOME/.config/amp" ]]; then
+			additional_dirs+=("$HOME/.config/amp")
+		fi
+		# Add ~/.agents to additional directories if it exists (shared agent resources)
+		if [[ -d "$HOME/.agents" ]]; then
+			additional_dirs+=("$HOME/.agents")
+		fi
+		shift
+		# All remaining arguments are passed to amp
+		claude_args=("$@")
+		;;
+	augment)
+		# Augment Code mode
+		command_flag="augment"
+		# Add ~/.augment to additional directories if it exists (settings, state)
+		if [[ -d "$HOME/.augment" ]]; then
+			additional_dirs+=("$HOME/.augment")
+		fi
+		shift
+		# All remaining arguments are passed to augment
 		claude_args=("$@")
 		;;
 	cleanup)

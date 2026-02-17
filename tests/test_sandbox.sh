@@ -344,6 +344,52 @@ fi
 rm -rf "$SPACE_TEST_DIR"
 
 #
+# Symlink path tests
+#
+
+echo ""
+echo "--- Symlink Path Tests ---"
+
+# Setup: create a real directory and a symlink pointing to it
+SYMLINK_TEST_TARGET="$HOME/.sandbox_symlink_target_$$"
+SYMLINK_TEST_LINK="$HOME/.sandbox_symlink_link_$$"
+mkdir -p "$SYMLINK_TEST_TARGET/subdir"
+echo "symlink_content" >"$SYMLINK_TEST_TARGET/subdir/file.txt"
+ln -s "$SYMLINK_TEST_TARGET" "$SYMLINK_TEST_LINK"
+
+echo "Test: -w via symlink allows writes through symlink path"
+if ./sandbox -w "$SYMLINK_TEST_LINK" sh -c "echo written > '$SYMLINK_TEST_LINK/subdir/new.txt'" 2>/dev/null; then
+	if [[ -f "$SYMLINK_TEST_TARGET/subdir/new.txt" ]] && [[ "$(cat "$SYMLINK_TEST_TARGET/subdir/new.txt")" == "written" ]]; then
+		pass "-w via symlink allows writes through symlink path"
+	else
+		fail "-w via symlink: file not created at target"
+	fi
+else
+	fail "-w via symlink allows writes through symlink path"
+fi
+
+echo "Test: -w via symlink allows writes through resolved path"
+if ./sandbox -w "$SYMLINK_TEST_LINK" sh -c "echo resolved > '$SYMLINK_TEST_TARGET/subdir/resolved.txt'" 2>/dev/null; then
+	if [[ -f "$SYMLINK_TEST_TARGET/subdir/resolved.txt" ]] && [[ "$(cat "$SYMLINK_TEST_TARGET/subdir/resolved.txt")" == "resolved" ]]; then
+		pass "-w via symlink allows writes through resolved path"
+	else
+		fail "-w via symlink: file not created via resolved path"
+	fi
+else
+	fail "-w via symlink allows writes through resolved path"
+fi
+
+echo "Test: --read-only via symlink allows reads through symlink path"
+if output=$(./sandbox --read-only "$SYMLINK_TEST_LINK" cat "$SYMLINK_TEST_LINK/subdir/file.txt" 2>&1) && [[ "$output" == "symlink_content" ]]; then
+	pass "--read-only via symlink allows reads through symlink path"
+else
+	fail "--read-only via symlink: could not read via symlink, got '$output'"
+fi
+
+# Cleanup
+rm -rf "$SYMLINK_TEST_TARGET" "$SYMLINK_TEST_LINK"
+
+#
 # Safe mode tests
 #
 
