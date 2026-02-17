@@ -386,6 +386,35 @@ else
 	fail "--read-only via symlink: could not read via symlink, got '$output'"
 fi
 
+echo "Test: --read-only via symlink blocks writes through symlink path"
+if ./sandbox --read-only "$SYMLINK_TEST_LINK" sh -c "echo bad > '$SYMLINK_TEST_LINK/subdir/file.txt'" 2>/dev/null; then
+	if [[ "$(cat "$SYMLINK_TEST_TARGET/subdir/file.txt")" == "symlink_content" ]]; then
+		pass "--read-only via symlink blocks writes through symlink path"
+	else
+		fail "--read-only via symlink: file was modified through symlink"
+	fi
+else
+	pass "--read-only via symlink blocks writes through symlink path"
+fi
+
+echo "Test: --read-only via symlink allows reads through resolved path"
+if output=$(./sandbox --read-only "$SYMLINK_TEST_LINK" cat "$SYMLINK_TEST_TARGET/subdir/file.txt" 2>&1) && [[ "$output" == "symlink_content" ]]; then
+	pass "--read-only via symlink allows reads through resolved path"
+else
+	fail "--read-only via symlink: could not read via resolved path, got '$output'"
+fi
+
+echo "Test: -w via symlink creates new file through symlink path"
+if ./sandbox -w "$SYMLINK_TEST_LINK" sh -c "echo created > '$SYMLINK_TEST_LINK/newfile.txt'" 2>/dev/null; then
+	if [[ -f "$SYMLINK_TEST_TARGET/newfile.txt" ]] && [[ "$(cat "$SYMLINK_TEST_TARGET/newfile.txt")" == "created" ]]; then
+		pass "-w via symlink creates new file through symlink path"
+	else
+		fail "-w via symlink: new file not created at target"
+	fi
+else
+	fail "-w via symlink creates new file through symlink path"
+fi
+
 # Cleanup
 rm -rf "$SYMLINK_TEST_TARGET" "$SYMLINK_TEST_LINK"
 
