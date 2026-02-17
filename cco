@@ -1983,6 +1983,10 @@ if [[ $# -gt 0 ]]; then
 		if [[ -d "$HOME/.local/state/amp" ]]; then
 			additional_dirs+=("$HOME/.local/state/amp")
 		fi
+		# Add ~/.amp (file-changes backups, internal state)
+		if [[ -d "$HOME/.amp" ]]; then
+			additional_dirs+=("$HOME/.amp")
+		fi
 		# Add ~/.agents to additional directories if it exists (shared agent resources)
 		if [[ -d "$HOME/.agents" ]]; then
 			additional_dirs+=("$HOME/.agents")
