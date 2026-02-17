@@ -982,6 +982,13 @@ run_native_sandbox() {
 	fi
 	sandbox_rules+=("--write" "$HOME/.npm")
 
+	# Allow writes to ~/.cache for tool caches (ESLint, Biome, Turbo, etc.)
+	# Without this, lint/format commands hang when they can't write cache files.
+	if [[ ! -d "$HOME/.cache" ]]; then
+		mkdir -p "$HOME/.cache"
+	fi
+	sandbox_rules+=("--write" "$HOME/.cache")
+
 	# Allow writes to project-specific .claude directory
 	if [[ -d "$project_claude_dir" ]]; then
 		sandbox_rules+=("--write" "$project_claude_dir")
