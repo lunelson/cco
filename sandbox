@@ -138,6 +138,71 @@ done
 OS="$(uname -s)"
 PWD_ABS="$(pwd -P)"
 
+# Resolve symlinks inside write/read-only directories.
+# Seatbelt (macOS) always resolves the full symlink chain before matching rules,
+# so if a directory contains symlinks pointing outside it, those targets need
+# their own rules. Scan one level deep for symlinks and add resolved targets.
+# Fully resolve a symlink (like readlink -f, but portable).
+# abs_path resolves the parent but not the final component; this resolves everything.
+resolve_symlink() {
+	local p="$1"
+	# Try readlink -f first (GNU/Linux and macOS 12.3+)
+	readlink -f "$p" 2>/dev/null && return
+	# Fallback: Python
+	python3 -c "import os,sys; print(os.path.realpath(sys.argv[1]))" "$p" 2>/dev/null && return
+	# Last resort: abs_path (better than nothing)
+	abs_path "$p"
+}
+
+_resolve_internal_symlinks() {
+	local i dir scan_dir entry target existing dominated
+	local count=${#write_paths[@]}
+	for ((i = 0; i < count; i++)); do
+		dir="${write_paths[$i]}"
+		[[ -d "$dir" ]] || continue
+		scan_dir="${write_paths_raw[$i]}"
+		for entry in "$scan_dir"/*; do
+			[[ -L "$entry" ]] || continue
+			target="$(resolve_symlink "$entry")" || continue
+			dominated=false
+			for existing in "${write_paths[@]+"${write_paths[@]}"}"; do
+				if [[ "$target" == "$existing" || "$target" == "$existing"/* ]]; then
+					dominated=true
+					break
+				fi
+			done
+			if [[ "$dominated" == false ]]; then
+				write_paths+=("$target")
+				write_paths_raw+=("$target")
+			fi
+		done
+	done
+
+	count=${#ro_paths[@]}
+	for ((i = 0; i < count; i++)); do
+		dir="${ro_paths[$i]}"
+		[[ -d "$dir" ]] || continue
+		scan_dir="${ro_paths_raw[$i]}"
+		for entry in "$scan_dir"/*; do
+			[[ -L "$entry" ]] || continue
+			target="$(resolve_symlink "$entry")" || continue
+			dominated=false
+			for existing in "${ro_paths[@]+"${ro_paths[@]}"}"; do
+				if [[ "$target" == "$existing" || "$target" == "$existing"/* ]]; then
+					dominated=true
+					break
+				fi
+			done
+			if [[ "$dominated" == false ]]; then
+				ro_paths+=("$target")
+				ro_paths_raw+=("$target")
+			fi
+		done
+	done
+}
+
+_resolve_internal_symlinks
+
 run_linux() {
 	command -v bwrap >/dev/null 2>&1 || {
 		echo "sandbox: bubblewrap (bwrap) is not installed." >&2
