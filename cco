@@ -1986,7 +1986,7 @@ if [[ $# -gt 0 ]]; then
 		;;
 	augment)
 		# Augment Code mode
-		command_flag="augment"
+		command_flag="auggie"
 		# Add ~/.augment to additional directories if it exists (settings, state)
 		if [[ -d "$HOME/.augment" ]]; then
 			additional_dirs+=("$HOME/.augment")
