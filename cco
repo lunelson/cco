@@ -1849,7 +1849,7 @@ while [[ $# -gt 0 ]]; do
 			while [[ $# -gt 0 ]] && [[ ! "$1" =~ ^- ]]; do
 				# Stop if we hit a known subcommand
 				case "$1" in
-				shell | codex | droid | opencode | pi | gemini | amp | augment | self-update | cleanup | info | backup-creds | restore-creds | pull | rebuild)
+				shell | codex | droid | opencode | pi | gemini | amp | auggie | self-update | cleanup | info | backup-creds | restore-creds | pull | rebuild)
 					# This is a subcommand, not a directory
 					break
 					;;
@@ -1984,8 +1984,8 @@ if [[ $# -gt 0 ]]; then
 		# All remaining arguments are passed to amp
 		claude_args=("$@")
 		;;
-	augment)
-		# Augment Code mode
+	auggie)
+		# Augment Code (auggie) mode
 		command_flag="auggie"
 		# Add ~/.augment to additional directories if it exists (settings, state)
 		if [[ -d "$HOME/.augment" ]]; then
